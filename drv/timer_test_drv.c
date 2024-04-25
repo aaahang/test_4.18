@@ -66,7 +66,7 @@ static int ot_open(struct inode * id, struct file * file)
         printk("%s,%d\n",__FUNCTION__,__LINE__);
     }
     gpio_direction_output(general_drv.led_gpio,0);
-
+    asd;
     init_timer(&general_drv.led_time);
     general_drv.led_time.function =  led_time_function;
     general_drv.led_time.expires  = jiffies  + msecs_to_jiffies(1000);

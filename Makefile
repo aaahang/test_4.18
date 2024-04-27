@@ -13,4 +13,4 @@ all:
 clean:
 	make -C $(KERN_DIR) M=`pwd` modules clean
 	rm -rf modules.order
-	rm -f ot_test
+	rm -f  test

@@ -2,7 +2,7 @@
   {
     "arguments": [
       "/home/stoicus/imx6ull/bsp/100ask_imx6ull-sdk/ToolChain/arm-buildroot-linux-gnueabihf_sdk-buildroot/bin/arm-buildroot-linux-gnueabihf-gcc",
-      "-Wp,-MD,/home/stoicus/imx6ull/source/test_learning_noqemu/test_4.18//drv/.gpio_test_drv.o.d",
+      "-Wp,-MD,/home/stoicus/imx6ull/source/test_learning_noqemu/test_4.18//drv/.io_blocking_drv.o.d",
       "-nostdinc",
       "-isystem",
       "/home/stoicus/imx6ull/bsp/100ask_imx6ull-sdk/ToolChain/arm-buildroot-linux-gnueabihf_sdk-buildroot/bin/../lib/gcc/arm-buildroot-linux-gnueabihf/7.5.0/include",
@@ -68,21 +68,21 @@
       "-Werror=incompatible-pointer-types",
       "-I/home/stoicus/imx6ull/source/test_learning_noqemu/test_4.18",
       "-DMODULE",
-      "-DKBUILD_BASENAME=\"gpio_test_drv\"",
-      "-DKBUILD_MODNAME=\"test_gpio\"",
+      "-DKBUILD_BASENAME=\"io_blocking_drv\"",
+      "-DKBUILD_MODNAME=\"test_drv\"",
       "-c",
       "-o",
-      "/home/stoicus/imx6ull/source/test_learning_noqemu/test_4.18//drv/.tmp_gpio_test_drv.o",
-      "/home/stoicus/imx6ull/source/test_learning_noqemu/test_4.18//drv/gpio_test_drv.c"
+      "/home/stoicus/imx6ull/source/test_learning_noqemu/test_4.18//drv/.tmp_io_blocking_drv.o",
+      "/home/stoicus/imx6ull/source/test_learning_noqemu/test_4.18//drv/io_blocking_drv.c"
     ],
     "directory": "/home/stoicus/imx6ull/bsp/100ask_imx6ull-sdk/Linux-4.9.88",
-    "file": "/home/stoicus/imx6ull/source/test_learning_noqemu/test_4.18/drv/gpio_test_drv.c",
-    "output": "/home/stoicus/imx6ull/source/test_learning_noqemu/test_4.18/drv/.tmp_gpio_test_drv.o"
+    "file": "/home/stoicus/imx6ull/source/test_learning_noqemu/test_4.18/drv/io_blocking_drv.c",
+    "output": "/home/stoicus/imx6ull/source/test_learning_noqemu/test_4.18/drv/.tmp_io_blocking_drv.o"
   },
   {
     "arguments": [
       "/home/stoicus/imx6ull/bsp/100ask_imx6ull-sdk/ToolChain/arm-buildroot-linux-gnueabihf_sdk-buildroot/bin/arm-buildroot-linux-gnueabihf-gcc",
-      "-Wp,-MD,/home/stoicus/imx6ull/source/test_learning_noqemu/test_4.18/.test_gpio.mod.o.d",
+      "-Wp,-MD,/home/stoicus/imx6ull/source/test_learning_noqemu/test_4.18/.test_drv.mod.o.d",
       "-nostdinc",
       "-isystem",
       "/home/stoicus/imx6ull/bsp/100ask_imx6ull-sdk/ToolChain/arm-buildroot-linux-gnueabihf_sdk-buildroot/bin/../lib/gcc/arm-buildroot-linux-gnueabihf/7.5.0/include",
@@ -147,17 +147,17 @@
       "-Werror=date-time",
       "-Werror=incompatible-pointer-types",
       "-I/home/stoicus/imx6ull/source/test_learning_noqemu/test_4.18",
-      "-DKBUILD_BASENAME=\"test_gpio.mod\"",
-      "-DKBUILD_MODNAME=\"test_gpio\"",
+      "-DKBUILD_BASENAME=\"test_drv.mod\"",
+      "-DKBUILD_MODNAME=\"test_drv\"",
       "-DMODULE",
       "-c",
       "-o",
-      "/home/stoicus/imx6ull/source/test_learning_noqemu/test_4.18/test_gpio.mod.o",
-      "/home/stoicus/imx6ull/source/test_learning_noqemu/test_4.18/test_gpio.mod.c"
+      "/home/stoicus/imx6ull/source/test_learning_noqemu/test_4.18/test_drv.mod.o",
+      "/home/stoicus/imx6ull/source/test_learning_noqemu/test_4.18/test_drv.mod.c"
     ],
     "directory": "/home/stoicus/imx6ull/bsp/100ask_imx6ull-sdk/Linux-4.9.88",
-    "file": "/home/stoicus/imx6ull/source/test_learning_noqemu/test_4.18/test_gpio.mod.c",
-    "output": "/home/stoicus/imx6ull/source/test_learning_noqemu/test_4.18/test_gpio.mod.o"
+    "file": "/home/stoicus/imx6ull/source/test_learning_noqemu/test_4.18/test_drv.mod.c",
+    "output": "/home/stoicus/imx6ull/source/test_learning_noqemu/test_4.18/test_drv.mod.o"
   },
   {
     "arguments": [
@@ -165,11 +165,10 @@
       "-c",
       "-o",
       "test",
-      "test.c",
-      "-I/home/stoicus/imx6ull/bsp/100ask_imx6ull-sdk/ToolChain/arm-buildroot-linux-gnueabihf_sdk-buildroot/arm-buildroot-linux-gnueabihf/sysroot/usr/include"
+      "./app/io_blcoking.c"
     ],
     "directory": "/home/stoicus/imx6ull/source/test_learning_noqemu/test_4.18",
-    "file": "/home/stoicus/imx6ull/source/test_learning_noqemu/test_4.18/test.c",
+    "file": "/home/stoicus/imx6ull/source/test_learning_noqemu/test_4.18/app/io_blcoking.c",
     "output": "/home/stoicus/imx6ull/source/test_learning_noqemu/test_4.18/test"
   }
 ]

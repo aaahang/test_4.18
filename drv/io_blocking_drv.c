@@ -1,4 +1,6 @@
+#include "asm-generic/current.h"
 #include "asm-generic/gpio.h"
+#include "asm/atomic.h"
 #include "asm/gpio.h"
 #include "asm/io.h"
 #include "asm/uaccess.h"
@@ -14,8 +16,10 @@
 #include "linux/node.h"
 #include "linux/of.h"
 #include "linux/printk.h"
+#include "linux/sched.h"
 #include "linux/stddef.h"
 #include "linux/types.h"
+#include "linux/wait.h"
 #include <linux/module.h>
 #include <linux/poll.h>
 #include <linux/fs.h>
@@ -49,21 +53,38 @@ static struct oftree_drv {
     struct cdev *cdev; //字符设备的
     struct property *  pt; //链表
     struct class * class;
-    struct timer_list led_time ;   
+    struct timer_list led_time;   
     int time_num ;
     int led_gpio;
     //KEY
     int key_gpio; 
     int irqnum;
-
+    atomic_t key_value;
 }general_drv;
+//初始化等待队列头
+static DECLARE_WAIT_QUEUE_HEAD(stoicus_wait);
 // tasklet 中断函数
 void tasklet_func(unsigned long data)
 {
     printk("%s,%d\n",__FUNCTION__,__LINE__);
 }
 // tasklet初始化 最后一个参数为传入中断函数的值
-DECLARE_TASKLET(led_tasklet,tasklet_func,0);
+static DECLARE_TASKLET(led_tasklet,tasklet_func,0);
+// timer初始化 
+void key_timer_function(unsigned long dat)
+{
+    if(gpio_get_value(general_drv.key_gpio)==1)
+    {
+        atomic_set(&general_drv.key_value,1);
+    }
+    else
+    {
+        atomic_set(&general_drv.key_value,0);
+        wake_up_interruptible(&stoicus_wait);
+    }
+
+}
+static DEFINE_TIMER(key_timer,key_timer_function,0,0); 
 void led_time_function(unsigned long data)
 {
     gpio_set_value(general_drv.led_gpio,!gpio_get_value(general_drv.led_gpio));
@@ -71,20 +92,11 @@ void led_time_function(unsigned long data)
 }
 static irqreturn_t stoicus_irq_handler_t(int irq_num, void * data)
 {
-
-    if (general_drv.key_gpio ==1)
-    {
-        printk("%s,%d\n",__FUNCTION__,__LINE__);
-    }
-    else
-    {
-        printk("%s,%d\n",__FUNCTION__,__LINE__);
-    }
     tasklet_schedule(&led_tasklet);
+    mod_timer(&key_timer,jiffies  + msecs_to_jiffies(30));
+
     return IRQ_RETVAL(IRQ_HANDLED);
 }
-
-
 
 static int ot_open(struct inode * id, struct file * file)
 { 
@@ -98,7 +110,7 @@ static int ot_open(struct inode * id, struct file * file)
         printk("%s,%d\n",__FUNCTION__,__LINE__);
     }
     gpio_direction_output(general_drv.led_gpio,0);
-    init_timer(&general_drv.led_time);
+    
     general_drv.led_time.function =  led_time_function;
     general_drv.time_num = 1000;
     general_drv.led_time.expires  = jiffies  + msecs_to_jiffies(general_drv.time_num);
@@ -123,6 +135,7 @@ static int ot_open(struct inode * id, struct file * file)
         printk("%s,%d\n",__FUNCTION__,__LINE__);
         goto irq_err;
      }
+     //阻塞io配置
 
     return 0;
 irq_err:
@@ -152,7 +165,7 @@ long ot_unlocked_ioctl(struct file * file, unsigned int cmd , unsigned long arg)
     }
 }
 // 进程退出时会调用
-int general_drv_release(struct inode * id, struct file * file)
+int ot_drv_release(struct inode * id, struct file * file)
 {
     printk("%s,%d\n",__FUNCTION__,__LINE__);
     free_irq(general_drv.irqnum,&general_drv);
@@ -161,11 +174,33 @@ int general_drv_release(struct inode * id, struct file * file)
     gpio_free(general_drv.led_gpio);
     gpio_free(general_drv.key_gpio);
 }
+ssize_t ot_read(struct file * fe, char __user * buf, size_t size, loff_t * loff)
+{
+    //申请当前进程的等待
+    DECLARE_WAITQUEUE(wait_R, current);
+    // 将等待加入到等待队列中
+    add_wait_queue(&stoicus_wait, &wait_R);
+    //将进程设置为可以中断唤醒并且将进程休眠
+    set_current_state(TASK_INTERRUPTIBLE);
+    // 进程轮转将cpu交出去
+    schedule();
+    // 将进程等待从队列中删除
+    remove_wait_queue(&stoicus_wait, &wait_R);
+    char key_push =1 ,key_pop =0; 
+    printk("read can run  func is %s line is %d\n",__FUNCTION__,__LINE__);
+    if(atomic_read(&general_drv.key_value) ==1)
+    copy_to_user(buf,&key_push,1);
+    else
+    copy_to_user(buf,&key_pop,1);
+    return 0 ;
+}
 static struct file_operations ot_fp =
 {
     .open = ot_open,
-    .release = general_drv_release,
-    .unlocked_ioctl = ot_unlocked_ioctl
+    .release = ot_drv_release,
+    .unlocked_ioctl = ot_unlocked_ioctl,
+    .read = ot_read
+    
 };  
  static const struct of_device_id irq_match[] = {
 	{ .compatible = "stiocus_led_stoicus" },

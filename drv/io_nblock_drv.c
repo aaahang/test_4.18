@@ -1,5 +1,6 @@
 #include "asm-generic/current.h"
 #include "asm-generic/gpio.h"
+#include "asm-generic/poll.h"
 #include "asm/atomic.h"
 #include "asm/gpio.h"
 #include "asm/io.h"
@@ -63,6 +64,7 @@ static struct oftree_drv {
 }general_drv;
 //初始化等待队列头
 static DECLARE_WAIT_QUEUE_HEAD(stoicus_wait);
+static DECLARE_WAIT_QUEUE_HEAD(stoicus_wait_poll);
 // tasklet 中断函数
 void tasklet_func(unsigned long data)
 {
@@ -76,11 +78,13 @@ void key_timer_function(unsigned long dat)
     if(gpio_get_value(general_drv.key_gpio)==1)
     {
         atomic_set(&general_drv.key_value,1);
+        printk("key is  down\n");
     }
     else
     {
+        printk("key is  up\n");
         atomic_set(&general_drv.key_value,0);
-        wake_up_interruptible(&stoicus_wait);
+        // wake_up_interruptible(&stoicus_wait); // 唤醒等待队列令其不再阻塞
     }
 
 }
@@ -92,8 +96,8 @@ void led_time_function(unsigned long data)
 }
 static irqreturn_t stoicus_irq_handler_t(int irq_num, void * data)
 {
-    tasklet_schedule(&led_tasklet);
-    mod_timer(&key_timer,jiffies  + msecs_to_jiffies(30));
+    tasklet_schedule(&led_tasklet); //令tasklet运行
+    mod_timer(&key_timer,jiffies + msecs_to_jiffies(10));  //开启key定时器 消抖
 
     return IRQ_RETVAL(IRQ_HANDLED);
 }
@@ -130,7 +134,7 @@ static int ot_open(struct inode * id, struct file * file)
 
     general_drv.irqnum =irq_of_parse_and_map(key_devnode,0);
     // 需要和设备树上一致 否则会报错
-    if(request_irq(general_drv.irqnum,stoicus_irq_handler_t,IRQF_TRIGGER_RISING |IRQF_TRIGGER_FALLING,"stoicus_irq",&general_drv)<0) //
+    if(request_irq(general_drv.irqnum,stoicus_irq_handler_t,IRQF_TRIGGER_RISING |IRQF_TRIGGER_FALLING,"stoicus_irq",&general_drv)<0) //上升沿下降沿都触发
      {
         printk("%s,%d\n",__FUNCTION__,__LINE__);
         goto irq_err;
@@ -142,29 +146,13 @@ irq_err:
     gpio_free(general_drv.key_gpio);
 key_err: 
     del_timer_sync(&general_drv.led_time);
-time_err:
+// time_err:
     gpio_free(general_drv.led_gpio);
         return -1;   
 }
 #define IO_TIMESTOP _IO(0,'C')
 #define IO_TIMEWIRTE _IOW(1,'C',int)
 
-long ot_unlocked_ioctl(struct file * file, unsigned int cmd , unsigned long arg)
-{
-    switch(cmd)
-    {
-        case IO_TIMESTOP:
-            del_timer(&general_drv.led_time);
-            break;
-        case IO_TIMEWIRTE:
-            copy_from_user(&general_drv.time_num,(int *)arg,sizeof(general_drv.time_num));
-            mod_timer(&general_drv.led_time,jiffies  + msecs_to_jiffies(general_drv.time_num)); 
-            break;  
-        default:
-            break;
-    }
-    return 0;
-}
 // 进程退出时会调用
 int ot_drv_release(struct inode * id, struct file * file)
 {
@@ -174,34 +162,39 @@ int ot_drv_release(struct inode * id, struct file * file)
     del_timer_sync(&general_drv.led_time);
     gpio_free(general_drv.led_gpio);
     gpio_free(general_drv.key_gpio);
+    return 0;
 }
+union 
+{
+    int value;
+    char data[4];
+}read_data;
 ssize_t ot_read(struct file * fe, char __user * buf, size_t size, loff_t * loff)
 {
+    read_data.value =atomic_read(&general_drv.key_value);
+    printk("%s , %d",__FUNCTION__,__LINE__);
     //申请当前进程的等待
-    DECLARE_WAITQUEUE(wait_R, current);
-    // 将等待加入到等待队列中
-    add_wait_queue(&stoicus_wait, &wait_R);
-    //将进程设置为可以中断唤醒并且将进程休眠
-    set_current_state(TASK_INTERRUPTIBLE);
-    // 进程轮转将cpu交出去
-    schedule();
-    // 将进程等待从队列中删除
-    remove_wait_queue(&stoicus_wait, &wait_R);
-    char key_push =1 ,key_pop =0; 
-    printk("read can run  func is %s line is %d\n",__FUNCTION__,__LINE__);
-    if(atomic_read(&general_drv.key_value) ==1)
-    copy_to_user(buf,&key_push,1);
-    else
-    copy_to_user(buf,&key_pop,1);
-    return 0 ;
+    return   copy_to_user(buf, read_data.data, 4);
+
 }
+unsigned int ot_poll(struct file * file, struct poll_table_struct * wait)
+{
+    unsigned int mask = 0; //一直返回0 就一直阻塞 直到超时 
+    poll_wait(file, &stoicus_wait_poll, wait); //poll 函数的主要函数
+    printk("%s,%d\n",__FUNCTION__,__LINE__);
+    if (atomic_read(&general_drv.key_value)==1)
+    {
+         mask |= POLLIN|POLLRDNORM;
+    }
+    return mask;
+}
+
 static struct file_operations ot_fp =
 {
     .open = ot_open,
     .release = ot_drv_release,
-    .unlocked_ioctl = ot_unlocked_ioctl,
-    .read = ot_read
-    
+    .read = ot_read,
+    .poll = ot_poll
 };  
  static const struct of_device_id irq_match[] = {
 	{ .compatible = "stiocus_led_stoicus" },
@@ -232,7 +225,8 @@ int irq_probe(struct platform_device * device)
 err1:    
         cdev_del(general_drv.cdev);
 err0: 
-    unregister_chrdev_region(general_drv.ot_dev,1);
+    unregister_chrdev_region(general_drv.ot_dev,1);\
+    return -1;
 }
 int irq_remove(struct platform_device *device)
 {
@@ -240,6 +234,7 @@ int irq_remove(struct platform_device *device)
     class_destroy(general_drv.class);
     cdev_del(general_drv.cdev);
     unregister_chrdev_region(general_drv.ot_dev,1);
+    return 0;
 }
 static struct platform_driver  stiocus_irq = {
 	.probe = irq_probe,

@@ -4,11 +4,11 @@ INCDIR := /home/stoicus/imx6ull/source/test_learning_noqemu/test_4.18
 TARGET :=  test_drv
 obj-m = $(TARGET).o
 EXTRA_CFLAGS += -I$(INCDIR)
-$(TARGET)-objs := /drv/io_blocking_drv.o
+$(TARGET)-objs := drv/io_nblock_drv.o
 
 all:
 	make -C $(KERN_DIR) M=`pwd` modules 
-	$(CROSS_COMPILE)gcc -o test ./app/io_blcoking.c
+	$(CROSS_COMPILE)gcc -o test ./app/io_nblock.c
 
 clean:
 	make -C $(KERN_DIR) M=`pwd` modules clean

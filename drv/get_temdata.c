@@ -4,7 +4,6 @@
 #include "asm/atomic.h"
 #include "asm/gpio.h"
 #include "asm/io.h"
-#include "asm/string.h"
 #include "asm/uaccess.h"
 #include "linux/blkdev.h"
 #include "linux/cdev.h"
@@ -48,7 +47,8 @@
 #include <linux/fcntl.h>
 #include <linux/timer.h>
 #include <linux/irqreturn.h>
-
+#include <linux/i2c.h>
+#include "am2320.c"
 static struct oftree_drv {
     //LED
     dev_t ot_dev; 
@@ -62,6 +62,7 @@ static struct oftree_drv {
     int key_gpio; 
     int irqnum;
     atomic_t key_value;
+    struct i2c_client * am2320_client ;
 }general_drv;
 //初始化等待队列头
 static DECLARE_WAIT_QUEUE_HEAD(stoicus_wait);
@@ -83,7 +84,7 @@ void key_timer_function(unsigned long dat)
     }
     else
     {
-        printk("key is  up\n");
+        printk("key is up\n");
         atomic_set(&general_drv.key_value,0);
         // wake_up_interruptible(&stoicus_wait); // 唤醒等待队列令其不再阻塞
     }
@@ -106,6 +107,7 @@ static irqreturn_t stoicus_irq_handler_t(int irq_num, void * data)
 static int ot_open(struct inode * id, struct file * file)
 { 
     //LED
+    file->private_data = &general_drv;
     struct device_node * led_devnode =  of_find_node_by_path("/led_stoicus");
     if (led_devnode == NULL)
      printk("%d\n",__LINE__);
@@ -170,15 +172,16 @@ union
     int value;
     char data[4];
 }read_data;
-
-ssize_t ot_read(struct file * fe, char __user * buf, size_t size, loff_t * loff)
+ssize_t ot_read(struct file * file, char __user * buf, size_t size, loff_t * loff)
 {
+    int am2320_data[2];
+    struct oftree_drv *gen_drv  = (struct oftree_drv *)file->private_data;
     read_data.value =atomic_read(&general_drv.key_value);
-    printk("%s , %d",__FUNCTION__,__LINE__);
-    //申请当前进程的等待xw
-    // memcpy(buf, read_data.data,4);
-    copy_to_user(buf, read_data.data,4);
-    return 0;
+    printk("%s , %d\n",__FUNCTION__,__LINE__);
+    am2320_read(gen_drv->am2320_client,am2320_data); 
+    printk("am2320 is%d,%d\n",am2320_data[0],am2320_data[1]);    
+    //申请当前进程的等待
+    return   copy_to_user(buf, read_data.data, 4);
 
 }
 unsigned int ot_poll(struct file * file, struct poll_table_struct * wait)
@@ -206,40 +209,55 @@ static struct file_operations ot_fp =
 	{ .compatible = "stiocus_led_stoicus" },
 	{},
 };
-int irq_probe(struct platform_device * device)
+struct miscdevice tom_con_msic =
+{
+    .minor = MISC_DYNAMIC_MINOR,
+    .name = "tem_con",
+    .fops = &ot_fp
+};
+
+static struct of_device_id  am2320_div[] = {
+    {.compatible ="stoicus,tem_get"},
+    {},
+};
+int am2320_probe(struct i2c_client * iic_client, const struct i2c_device_id * i2c_id){
+    printk("%s , %d\n",__FUNCTION__,__LINE__);    
+    general_drv.am2320_client = iic_client; 
+    if (misc_register(&tom_con_msic)<0) { //使用misc一次注册
+        printk("misc is error %s , %d",__FUNCTION__,__LINE__);    
+        return -1;
+    };
+    return 0;
+}
+int am2320_remove(struct i2c_client * iic_clinet)
+{
+    misc_deregister(&tom_con_msic);
+    return 0;
+}
+struct i2c_device_id iic_deviceb = 
 {
 
-   if( alloc_chrdev_region(&general_drv.ot_dev,0,1,"stoicus_ot"))
-   {
-        printk("%d\n",__LINE__);
-    	return -EFAULT;
-   }
-    if((general_drv.cdev = cdev_alloc()) ==NULL)
-    {
-        printk("%d",__LINE__);
-        goto err0;
-    }
-    cdev_init(general_drv.cdev,&ot_fp);
-    cdev_add(general_drv.cdev,general_drv.ot_dev,1);
-    if(IS_ERR(general_drv.class = class_create(THIS_MODULE,"stoicus_OT_TREE")))
-    {
-        printk("%d",__LINE__);
-        goto err1;
-    }
-    device_create(general_drv.class,NULL,general_drv.ot_dev,NULL,"stoicus_ot_tree");
+};
+static struct i2c_driver am2320_drv ={
+    .probe = am2320_probe,
+    .remove = am2320_remove,
+    .id_table = &iic_deviceb,  // 可以什么东西都没有 但是必须要有id_table 没有无法probe
+    .driver = {
+        .name = "get_temdata",
+        .owner  = THIS_MODULE,
+        .of_match_table = am2320_div,
+    },
+};
+/*
+int irq_probe(struct platform_device * device)
+{
+    printk("%s , %d\n",__FUNCTION__,__LINE__); 
+    i2c_add_driver(&am2320_drv);
     return 0;
-err1:    
-        cdev_del(general_drv.cdev);
-err0: 
-    unregister_chrdev_region(general_drv.ot_dev,1);\
-    return -1;
 }
 int irq_remove(struct platform_device *device)
 {
-    device_destroy(general_drv.class,general_drv.ot_dev);
-    class_destroy(general_drv.class);
-    cdev_del(general_drv.cdev);
-    unregister_chrdev_region(general_drv.ot_dev,1);
+    i2c_del_driver(&am2320_drv);
     return 0;
 }
 static struct platform_driver  stiocus_irq = {
@@ -250,16 +268,24 @@ static struct platform_driver  stiocus_irq = {
 		.of_match_table	= irq_match,
 	},
 };
-// static int __init of_init(void)
-// {
-//     platform_driver_register(&stiocus_irq);
-//     return 0;
-// }
-// static void  __exit of_exit(void)
-// {
-//     platform_driver_unregister(&stiocus_irq);
-// }
-// module_init(of_init);
-// module_exit(of_exit);
+
+
 module_platform_driver(stiocus_irq);  //只用这一个函数可以替代之前的
+MODULE_LICENSE("GPL");
+
+
+// MISC 杂项设备
+
+
+*/
+static int __init of_init(void)
+{  
+    return i2c_add_driver(&am2320_drv);
+}
+static void  __exit of_exit(void)
+{
+    i2c_del_driver(&am2320_drv);
+}
+module_init(of_init);
+module_exit(of_exit);
 MODULE_LICENSE("GPL");

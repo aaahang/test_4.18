@@ -3,16 +3,17 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include "sys/ioctl.h"
+#include <unistd.h>
 
-#define IO_TIMESTOP _IO(0,'C')
-#define IO_TIMEWIRTE _IOW(1,'C',int)
+
 int main(int argc,char *argv[])
 {
+    char buf[10];
     int fd = open(argv[1],O_RDWR);
-    while (1);
-    // {
-    //     scanf("%s",)
-    //     ioctl(fd,IO_TIMESTOP)
-    // }
+    while (1)
+    {
+      read(fd,buf,10);
+      sleep(1);
+    }
     return 0;
 }

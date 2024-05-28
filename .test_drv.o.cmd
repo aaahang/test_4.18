@@ -1,0 +1,1 @@
+cmd_/home/stoicus/imx6ull/source/test_learning_noqemu/test_4.18/test_drv.o := arm-buildroot-linux-gnueabihf-ld -EL   -r -o /home/stoicus/imx6ull/source/test_learning_noqemu/test_4.18/test_drv.o /home/stoicus/imx6ull/source/test_learning_noqemu/test_4.18/drv/get_temdata.o 

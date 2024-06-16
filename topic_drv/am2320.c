@@ -27,6 +27,7 @@ int am2320_read(struct i2c_client *am2320_client, int data[2])
 {
     char read_data[8];
     char set_data[3] = {0x03,0x00,0x04};
+    char read_data_transfer[8];
     static char st_data[2];
     struct i2c_msg msg[2];
     msg[0].addr = am2320_client->addr;
@@ -43,20 +44,13 @@ int am2320_read(struct i2c_client *am2320_client, int data[2])
     msg[1].buf = read_data; /* 读取数据缓冲区 */
     msg[1].len = 8; /* 要读取的数据长度 */
      
-    
     ret =i2c_transfer(am2320_client->adapter,&msg[1],1);
-    data[0]  = (read_data[3]|read_data[2]<<8); // 
-    data[1] = (read_data[5]|read_data[4]<<8);
-    if(crc16(read_data,6) != (read_data[6]|read_data[7]<<8))
+    for (size_t i = 0; i < 8; i++)
+        read_data_transfer[i] = read_data[i];
+    if(crc16(read_data_transfer,6) == (read_data[6] | read_data[7]<<8))
     {
-        for (size_t i = 0; i <2; i++)
-        {
-            data[i] =st_data[i];
-        }
+         data[0]  = (read_data[3]|read_data[2]<<8); // 
+         data[1] =  (read_data[5]|read_data[4]<<8);
     }
-    for (size_t i = 0; i <2; i++)
-    {
-        st_data[i] =data[i];
-    }
-
+    return 0;
 }

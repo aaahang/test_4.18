@@ -182,12 +182,12 @@ union {
   }am2320_tranfer;
 ssize_t ot_read(struct file * file, char __user * buf, size_t size, loff_t * loff)
 {
-    int am2320_data[2];
+    static int am2320_data[2];
     struct oftree_drv *gen_drv  = (struct oftree_drv *)file->private_data;
     read_data.value =atomic_read(&general_drv.key_value);
-    printk("%s , %d\n",__FUNCTION__,__LINE__);
+    // printk("%s , %d\n",__FUNCTION__,__LINE__);
     am2320_read(gen_drv->am2320_client,am2320_data); 
-    printk("am2320 is%d,%d\n",am2320_data[0],am2320_data[1]);    
+    // printk("am2320 is%d,%d\n",am2320_data[0],am2320_data[1]);    
     am2320_tranfer.rl.hum = am2320_data[0];
     am2320_tranfer.rl.tem = am2320_data[1];
     //申请当前进程的等待
